@@ -29,7 +29,7 @@ export default defineComponent({
             container.value.appendChild(renderer.domElement);
 
             // Añadir una malla como plano
-            const geometry = new THREE.PlaneGeometry(10, 10);
+            const geometry = new THREE.BoxGeometry(10, 10, 0.1);
             const material = new THREE.MeshBasicMaterial({
                 color: 0x00ff00,
                 side: THREE.DoubleSide,
@@ -51,7 +51,7 @@ export default defineComponent({
             controls.enableZoom = true; // Permitir zoom
 
             controls.maxPolarAngle = Math.PI / 2; // Fijar la cámara horizontalmente
-
+            // A recordar, X Y Z, rojo, amarillo, azul en el gizmo
             // Puntos 2D del polígono
             const fireSurface = [
                 new THREE.Vector3(-2, 3, -2),
@@ -84,39 +84,61 @@ export default defineComponent({
 
             scene.add(fireSurfaceMesh);
 
-            // Convertir a puntos 3D con Z inicial alta
+            // Convertir a puntos 3D con Y inicial alta
             const points3D = fireSurface.map(
-                (point) => new THREE.Vector3(point.x, point.y)
+                (point) => new THREE.Vector3(point.x, 10, point.z)
             );
 
             // Raycaster para calcular intersecciones
-            const raycaster = new THREE.Raycaster();
+
             const intersections: THREE.Vector3[] = [];
 
             points3D.forEach((point) => {
-                raycaster.set(point, new THREE.Vector3(0, 0, -1));
-                const hits = raycaster.intersectObject(planeMesh);
-                if (hits.length > 0) {
-                    intersections.push(hits[0].point);
-                }
-            });
+                let raycaster = new THREE.Raycaster();
+                let raycastDestinationPoint = new THREE.Vector3(0, -1, 0);
 
+                raycaster.set(point, raycastDestinationPoint);
+
+                const length = 20; // Longitud de la línea
+
+                const hits = raycaster.intersectObject(planeMesh);
+                console.log("hit!", hits);
+                let material = new THREE.LineBasicMaterial({
+                    color: 0xff0000,
+                });
+                if (hits.length > 0) {
+                    intersections.push(hits[1].point);
+                    material = new THREE.LineBasicMaterial({
+                        color: 0x00ff00,
+                    });
+                }
+
+                const origin = point; // Origen de la línea
+                const direction = raycastDestinationPoint.normalize(); // Direcci
+                const endPoint = origin
+                    .clone()
+                    .add(direction.multiplyScalar(length));
+                const geometry = new THREE.BufferGeometry().setFromPoints([
+                    origin,
+                    endPoint,
+                ]);
+
+                const line = new THREE.Line(geometry, material);
+                scene.add(line);
+            });
+            console.log(intersections);
             // Si hay suficientes puntos de intersección, crear una nueva superficie
             if (intersections.length > 2) {
-                const shape = new THREE.Shape(
-                    intersections.map((p) => new THREE.Vector2(p.x, p.y))
-                );
-                const shapeGeometry = new THREE.ShapeGeometry(shape);
-                const shapeMaterial = new THREE.MeshBasicMaterial({
-                    color: 0xff0000,
-                    side: THREE.DoubleSide,
-                    wireframe: true,
+                intersections.map((point) => {
+                    const sphere = new THREE.Mesh(
+                        new THREE.SphereGeometry(15, 32, 16),
+                        new THREE.MeshBasicMaterial({ color: 0x0000ff })
+                    );
+                    sphere.position.copy(point);
+
+                    console.log(sphere.position);
+                    scene.add(sphere);
                 });
-                const surfaceMesh = new THREE.Mesh(
-                    shapeGeometry,
-                    shapeMaterial
-                );
-                scene.add(surfaceMesh);
             }
 
             // Animación
